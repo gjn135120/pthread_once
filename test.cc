@@ -1,114 +1,79 @@
 #include <iostream>
-#include <string>
-#include <vector>
-#include <stdint.h>
-#include <string.h>
-#include <stdio.h>
+#include "MutexLock.h"
+#include "Thread.h"
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/time.h>
-#include "Vector.hpp"
 using namespace std;
 
 int64_t getUTime();
 
-const int kSize = 1000 * 1000;
-//int arr[kSize];
-
-void test0() //
+//多线程下具有隐患
+class Singleton
 {
-    int arr[kSize];  //bad_alloc
-    int64_t startTime = getUTime();
-    for(int i = 0; i != kSize; ++i)
+public:
+    static Singleton *getInstance()
     {
-        arr[i] = i;
+        if(pInstance_ == NULL)
+        {
+            mutex_.lock();
+            if(pInstance_ == NULL) //线程的切换
+                pInstance_ = new Singleton;
+            mutex_.unlock();
+        }
+
+        return pInstance_;
     }
-    int64_t endTime = getUTime();
-    int64_t diffTime = endTime - startTime;
+private:
+    Singleton() { }
 
-    cout << "test0 cost : " << diffTime << " us" << endl;
-}
+    static Singleton *pInstance_;
+    static MutexLock mutex_;
+};
 
-void test1() //
+Singleton *Singleton::pInstance_ = NULL;
+MutexLock Singleton::mutex_;
+
+class TestThread : public Thread
 {
-    int *arr = new int[kSize];  //bad_alloc
-    int64_t startTime = getUTime();
-    for(int i = 0; i != kSize; ++i)
+public:
+    void run()
     {
-        arr[i] = i;
+        const int kCount = 1000 * 1000;
+        for(int ix = 0; ix != kCount; ++ix)
+        {
+            Singleton::getInstance();
+        }
     }
-    int64_t endTime = getUTime();
-    int64_t diffTime = endTime - startTime;
-    delete[] arr;
-    cout << "test1 cost : " << diffTime  << " us" << endl;
-}
-
-void test2()
-{
-    vector<int> coll;
-
-    int64_t startTime = getUTime();
-    for(int i = 0; i != kSize; ++i)
-    {
-        coll.push_back(i);
-    }
-    int64_t endTime = getUTime();
-    int64_t diffTime = endTime - startTime;
-    cout << "test2 cost : " << diffTime  << " us" << endl;
-}
-
-void test3()
-{
-    vector<int> coll(kSize);
-
-    int64_t startTime = getUTime();
-    for(int i = 0; i != kSize; ++i)
-    {
-        coll[i] = i;
-    }
-    int64_t endTime = getUTime();
-    int64_t diffTime = endTime - startTime;
-    cout << "test3 cost : " << diffTime  << " us" << endl;
-}
-
-void test4()
-{
-    Vector<int> coll;
-
-    int64_t startTime = getUTime();
-    for(int i = 0; i != kSize; ++i)
-    {
-        coll.push_back(i);
-    }
-    int64_t endTime = getUTime();
-    int64_t diffTime = endTime - startTime;
-    cout << "test4 cost : " << diffTime  << " us" << endl;
-}
-
-void test5()
-{
-    Vector<int> coll(kSize);
-
-    int64_t startTime = getUTime();
-    for(int i = 0; i != kSize; ++i)
-    {
-        coll[i] = i;
-    }
-    int64_t endTime = getUTime();
-    int64_t diffTime = endTime - startTime;
-    cout << "test5 cost : " << diffTime  << " us" << endl;
-}
-
+};
 
 int main(int argc, char const *argv[])
 {
-    test0();
-    test1();
-    test2();
-    test3();
-    test4();
-    test5();
+    //Singleton s; ERROR
+
+    int64_t startTime = getUTime();
+
+    const int KSize = 100;
+    TestThread threads[KSize];
+    for(int ix = 0; ix != KSize; ++ix)
+    {
+        threads[ix].start();
+    }
+
+    for(int ix = 0; ix != KSize; ++ix)
+    {
+        threads[ix].join();
+    }
+
+    int64_t endTime = getUTime();
+
+    int64_t diffTime = endTime - startTime;
+    cout << "cost : " << diffTime / 1000 << " ms" << endl;
+
     return 0;
 }
+
 
 
 int64_t getUTime()
